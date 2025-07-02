@@ -1,1 +1,6 @@
 kafka-python
+langchain
+langchain-community
+neo4j
+redis
+dotenv

@@ -1,20 +1,24 @@
 import logging
+import os
 import json
 import time
 import random
+from dotenv import load_dotenv
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
 from news_data import articles
+
+load_dotenv(verbose=True)
+
+KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "articles")
+MAX_CONNECTION_ATTEMPTS = int(os.environ.get("MAX_CONNECTION_ATTEMPTS"))
 
 # Better log formatting for module clarity
 log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
 logging.basicConfig(level=logging.INFO, format=log_format)
 logger = logging.getLogger(__name__)
 
-
-KAFKA_TOPIC = 'articles'
-MAX_CONNECTION_ATTEMPTS = 5
 
 def create_producer():
     """Create a Kafka producer."""
