@@ -7,7 +7,9 @@ from kafka.errors import KafkaError
 
 from news_data import articles
 
-logging.basicConfig(level=logging.INFO)
+# Better log formatting for module clarity
+log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+logging.basicConfig(level=logging.INFO, format=log_format)
 logger = logging.getLogger(__name__)
 
 
