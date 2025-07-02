@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Requirement for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+  
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"  # Connecting from out local machine
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_OFFSET_TOPIC_REPLICATION_FACTOR: 1
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+  
+  # Neo4j
+  neo4j:
+    image: neo4j:5.20.0
+    container_name: neo4j
+    ports:
+      - "7474:7474"  # Browser UI
+      - "7687:7687"  # Bolt for python driver
+    environment:
+      NEO4J_AUTH: neo4j/password123  # Default username and password
+    volumes:
+      - ./neo4j/data:/data  # Persist data
