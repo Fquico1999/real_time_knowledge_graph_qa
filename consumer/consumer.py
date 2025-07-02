@@ -1,14 +1,19 @@
 import json
 import logging
 import os
+import time
 from kafka import KafkaConsumer
+from kafka.errors import NoBrokersAvailable
 from neo4j import GraphDatabase
+from neo4j.exceptions import ServiceUnavailable
 import redis
+from redis.exceptions import ConnectionError as RedisConnectionError
+from typing import List
 
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.globals import set_debug
 from pydantic import BaseModel, Field
-from typing import List
 
 log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
 logging.basicConfig(level=logging.INFO, format=log_format)
@@ -28,8 +33,9 @@ class Entities(BaseModel):
 
 # Setup LLM and Extraction Chain
 llm = ChatOllama(model="mistral", temperature=0)
+set_debug(True)  # Enable debug mode for LangChain
 
-# Create prompt temmplate
+# Create prompt template
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are an expert at extracting information from text. You must extract the named entities from the following article content. Respond with a valid JSON object."),
     ("human", "{article_content}")
@@ -37,26 +43,69 @@ prompt = ChatPromptTemplate.from_messages([
 
 entity_extraction_chain = prompt | llm.with_structured_output(Entities)
 
+def get_kafka_consumer(topic, servers):
+    """Create a Kafka consumer for the specified topic."""
+    while True:
+        try:
+            consumer = KafkaConsumer(
+                topic,
+                bootstrap_servers=servers,
+                auto_offset_reset='earliest',
+                value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+            )
+            logger.info(f"Kafka consumer created for topic '{topic}' on servers '{servers}'.")
+            return consumer
+        except NoBrokersAvailable:
+            logger.warning(f"Could not connect to Kafka brokers. Retrying in 3 seconds...")
+            time.sleep(3)
+        except Exception as e:
+            logger.error(f"Error creating Kafka consumer: {e}")
+            raise
+
+def get_neo4j_driver(uri, user, password):
+    """Create a Neo4j driver."""
+    while True:
+        try:
+            driver = GraphDatabase.driver(uri, auth=(user, password))
+            driver.verify_connectivity()
+            logger.info(f"Connected to Neo4j at {uri} as user '{user}'.")
+            return driver
+        except ServiceUnavailable:
+            logger.warning(f"Could not connect to Neo4j at {uri}. Retrying in 3 seconds...")
+            time.sleep(3)
+        except Exception as e:
+            logger.error(f"Error connecting to Neo4j: {e}")
+            raise
+
+def get_redis_client(host, port):
+    """Create a Redis client."""
+    while True:
+        try:
+            client = redis.Redis(host=host, port=port, db=0, decode_responses=True)
+            client.ping()  # Test connection
+            logger.info(f"Connected to Redis at {host}:{port}.")
+            return client
+        except RedisConnectionError:
+            logger.warning(f"Could not connect to Redis at {host}:{port}. Retrying in 3 seconds...")
+            time.sleep(3)
+        except Exception as e:
+            logger.error(f"Error connecting to Redis: {e}")
+            raise
+
 # Database connections
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password123")
-neo4j_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+neo4j_driver = get_neo4j_driver(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = os.getenv("REDIS_PORT", 6379)
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+redis_client = get_redis_client(REDIS_HOST, REDIS_PORT)
 
 # Kafka Consumer setup
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "articles")
 KAFKA_BROKER_URL = os.getenv("KAFKA_BROKER_URL", "localhost:29092")
-
-consumer = KafkaConsumer(
-    KAFKA_TOPIC,
-    bootstrap_servers=KAFKA_BROKER_URL,
-    auto_offset_reset='earliest',
-    value_deserializer=lambda x: json.loads(x.decode('utf-8'))
-)
+consumer = get_kafka_consumer(KAFKA_TOPIC, KAFKA_BROKER_URL)
 
 
 def add_to_graph(tx, article_id:str, title:str, entities:Entities):
