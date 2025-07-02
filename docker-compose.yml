@@ -42,3 +42,27 @@ services:
       NEO4J_AUTH: neo4j/password123  # Default username and password
     volumes:
       - ./neo4j/data:/data  # Persist data
+
+  ollama:
+    build:
+      context: ./ollama
+    container_name: ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: "all"
+              capabilities: ["gpu"]
+
+  consumer:
+    build:
+      context: ./consumer
+    container_name: consumer
+    env_file:
+      - ./.env
+    depends_on:
+      - kafka
+      - redis
+      - neo4j
+      - ollama
