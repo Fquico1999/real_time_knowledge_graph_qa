@@ -81,6 +81,7 @@ services:
     restart: always
     volumes:
       - ./producer/feeds.json:/app/feeds.json:ro  # Mount feeds config
+      - ./producer/processed_articles.log:/app/processed_articles.log  # Mount processed articles log
 
   # Web app
   webapp:
