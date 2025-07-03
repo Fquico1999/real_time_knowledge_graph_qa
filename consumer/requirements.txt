@@ -1,5 +1,4 @@
 kafka-python
-neo4j
 redis
 langchain
 langchain-ollama
