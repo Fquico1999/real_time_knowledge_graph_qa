@@ -76,6 +76,9 @@ services:
     container_name: producer
     env_file:
       - ./.env
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       - kafka
     restart: always
