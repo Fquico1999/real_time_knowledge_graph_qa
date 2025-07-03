@@ -56,7 +56,7 @@ services:
             - driver: nvidia
               count: "all"
               capabilities: ["gpu"]
-
+  # Consumer
   consumer:
     build:
       context: ./consumer
@@ -68,6 +68,17 @@ services:
       - redis
       - neo4j
       - ollama
+
+  # Producer
+  producer:
+    build:
+      context: ./producer
+    container_name: producer
+    env_file:
+      - ./.env
+    depends_on:
+      - kafka
+    restart: always
 
   # Web app
   webapp:

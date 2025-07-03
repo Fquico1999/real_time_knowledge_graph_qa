@@ -1,0 +1,67 @@
+[
+  {
+    "url": "http://feeds.wired.com/wired/index",
+    "interval_seconds": 3600,
+    "category": "Technology"
+  },
+  {
+    "url": "https://techcrunch.com/feed/",
+    "interval_seconds": 1800,
+    "category": "Technology & Startups"
+  },
+  {
+    "url": "https://www.theverge.com/rss/index.xml",
+    "interval_seconds": 2700,
+    "category": "Technology & Culture"
+  },
+  {
+    "url": "http://feeds.arstechnica.com/arstechnica/index/",
+    "interval_seconds": 4500,
+    "category": "In-depth Technology"
+  },
+  {
+    "url": "http://feeds.bbci.co.uk/news/rss.xml",
+    "interval_seconds": 900,
+    "category": "World News"
+  },
+  {
+    "url": "https://feeds.reuters.com/reuters/topNews",
+    "interval_seconds": 600,
+    "category": "World News"
+  },
+  {
+    "url": "https://www.aljazeera.com/xml/rss/all.xml",
+    "interval_seconds": 1200,
+    "category": "World News"
+  },
+  {
+    "url": "https://www.npr.org/rss/rss.php?id=1001",
+    "interval_seconds": 3600,
+    "category": "World News"
+  },
+  {
+    "url": "https://www.sciencedaily.com/rss/all.xml",
+    "interval_seconds": 7200,
+    "category": "Science"
+  },
+  {
+    "url": "https://phys.org/rss-feed/",
+    "interval_seconds": 5400,
+    "category": "Science"
+  },
+  {
+    "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+    "interval_seconds": 1800,
+    "category": "Finance"
+  },
+  {
+    "url": "https://www.theguardian.com/us/film/rss",
+    "interval_seconds": 86400,
+    "category": "Culture & Entertainment"
+  },
+  {
+    "url": "https://longform.org/feed",
+    "interval_seconds": 86400,
+    "category": "In-depth Articles"
+  }
+]
