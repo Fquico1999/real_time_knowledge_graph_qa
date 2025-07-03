@@ -8,12 +8,13 @@ RUN set -e; \
         sleep 1; \
         ollama_pids=$(pgrep ollama); \
     done; \
-    echo "Ollama server started with PIDs: $ollama_pids"; \
+    echo "Ollama server started. Pre-pulling models..."; \
     ollama pull mistral; \
-    echo "Killing Ollama server PIDs: $ollama_pids"; \
+    ollama pull mixtral; \
+    echo "Finished pulling models. Killing temporary server..."; \
     kill $ollama_pids; \
     # Wait for the processes to be fully killed
     while pgrep ollama > /dev/null; do \
         sleep 1; \
     done; \
-    echo "Ollama server stopped."
+    echo "Ollama server stopped. Build step complete."

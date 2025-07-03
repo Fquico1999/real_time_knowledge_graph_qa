@@ -36,7 +36,7 @@ try:
     graph.refresh_schema()
 
     llm = ChatOllama(
-        model="mistral",
+        model="mixtral",
         base_url=OLLAMA_HOST,
         temperature=0
     )
