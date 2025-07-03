@@ -3,7 +3,10 @@ import os
 from langchain_neo4j import Neo4jGraph
 from langchain_ollama import ChatOllama
 from langchain_neo4j import GraphCypherQAChain
+from langchain.prompts.prompt import PromptTemplate
 from langchain_core.globals import set_debug
+
+from prompt import CYPHER_GENERATION_TEMPLATE
 
 st.set_page_config(
     page_title="Graph Q&A",
@@ -38,9 +41,15 @@ try:
         temperature=0
     )
 
+    CYPHER_GENERATION_PROMPT = PromptTemplate(
+        input_variables=["schema", "question"],
+        template=CYPHER_GENERATION_TEMPLATE
+    )
+
     chain = GraphCypherQAChain.from_llm(
         llm=llm,
         graph=graph,
+        cypher_prompt=CYPHER_GENERATION_PROMPT,
         verbose=True,
         return_intermediate_steps=True,
         allow_dangerous_requests=True,
