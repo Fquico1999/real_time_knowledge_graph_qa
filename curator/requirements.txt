@@ -1,0 +1,5 @@
+redis
+neo4j
+langchain
+langchain-ollama
+pydantic<3,>=1

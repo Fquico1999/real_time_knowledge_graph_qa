@@ -66,9 +66,8 @@ services:
     depends_on:
       - kafka
       - redis
-      - neo4j
-      - ollama
-
+    restart: always
+  
   # Producer
   producer:
     build:
@@ -86,6 +85,19 @@ services:
       - ./producer/feeds.json:/app/feeds.json:ro  # Mount feeds config
       - ./producer/processed_articles.log:/app/processed_articles.log  # Mount processed articles log
 
+  # curator
+  curator:
+    build:
+      context: ./curator
+    container_name: curator
+    env_file:
+      - ./.env
+    depends_on:
+      - redis
+      - neo4j
+      - ollama
+    restart: always
+  
   # Web app
   webapp:
     build:
