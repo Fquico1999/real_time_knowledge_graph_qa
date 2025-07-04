@@ -8,6 +8,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    restart: always
   
   # Kafka
   kafka:
@@ -23,6 +24,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_OFFSET_TOPIC_REPLICATION_FACTOR: 1
+    restart: always
 
   # Redis
   redis:
@@ -30,7 +32,10 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
-  
+    volumes:
+      - redis-data:/data
+    restart: always
+
   # Neo4j
   neo4j:
     image: neo4j:5.20.0
@@ -44,6 +49,7 @@ services:
       NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
     volumes:
       - ./neo4j/data:/data  # Persist data
+    restart: always
 
   ollama:
     build:
@@ -56,6 +62,8 @@ services:
             - driver: nvidia
               count: "all"
               capabilities: ["gpu"]
+    restart: always
+
   # Consumer
   consumer:
     build:
@@ -110,3 +118,9 @@ services:
     depends_on:
       - neo4j
       - ollama
+    restart: always
+
+
+volumes:
+  redis-data:
+  neo4j-data:
