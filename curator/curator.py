@@ -17,6 +17,7 @@ log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(messag
 logging.basicConfig(level=logging.INFO, format=log_format)
 logger = logging.getLogger(__name__)
 
+BATCH_SIZE = 100
 CURATION_INTERVAL_SECONDS = 300 # Run every 5 minutes
 
 def get_neo4j_driver(uri, user, password):
@@ -56,8 +57,8 @@ def get_existing_entities(tx, entity_names: List[str]):
     MATCH (e)
     WHERE e.name = entity_name
     RETURN e.name AS name, labels(e)[0] AS type"""
-    result = tx.run(query, entity_names=entity_names)
-    return {dict(record) for record in result}
+    result = tx.run(query, names=entity_names)
+    return [dict(record) for record in result]
 
 def add_refined_to_graph(tx, refined_data: dict):
     """Writes only new, validated entities and relationships to the graph."""
@@ -105,44 +106,62 @@ def main():
         try:
             logger.info("Starting new curation cycle...")
 
-            # Fetch batch of raw extractions from Redis
-            raw_extractions_json = redis_client.lrange(REDIS_QUEUE_KEY, 0, -1)
-            redis_client.ltrim(REDIS_QUEUE_KEY, len(raw_extractions_json), -1)  # Clear the queue
-
-
-            if not raw_extractions_json:
-                logger.info("No new raw extractions found. Waiting for next cycle...")
+            queue_size = redis_client.llen(REDIS_QUEUE_KEY)
+            
+            if queue_size == 0:
+                logger.info("No raw extractions to process. Sleeping...")
                 time.sleep(CURATION_INTERVAL_SECONDS)
                 continue
 
-            raw_extractions = [json.loads(item) for item in raw_extractions_json]
-            logger.info(f"Processing {len(raw_extractions)} raw extractions...")
+            logger.info(f"{queue_size} items found in queue. Starting batch processing.")
 
-            # Aggregate all entities to check against existing graph
-            all_entity_names = set()
-            for extraction in raw_extractions:
-                for entity in extraction.get("entities", []):
-                    all_entity_names.add(entity['name'])
+            while redis_client.llen(REDIS_QUEUE_KEY) > 0:
+                
+                # Fetch batch of raw extractions from Redis
+                raw_extractions_json = redis_client.lrange(REDIS_QUEUE_KEY, 0, BATCH_SIZE-1)
 
-            # Get context from graph
-            with neo4j_driver.session() as session:
-                existing_graph_data = session.execute_read(get_existing_entities, list(all_entity_names))
-            
-            # Call ollama to refine entire batch
-            logger.info("Calling LLM to refine raw extractions...")
-            refined_data = refinement_chain.invoke({
-                "graph_context": json.dumps(existing_graph_data, indent=2),
-                "new_extraction": json.dumps(raw_extractions, indent=2)
-            })
+                if not raw_extractions_json:
+                    break
 
-            # Write validated knowledge to Graph
-            if refined_data and (refined_data.get("new_entities") or refined_data.get("new_relationships")):
+                batch_extractions = [json.loads(item) for item in raw_extractions_json]
+
+                # Aggregate entities for batch
+                all_entity_names = set()
+                for extraction in batch_extractions:
+                    for entity in extraction.get("entities", []):
+                        all_entity_names.add(entity['name'])
+                
+                if not all_entity_names:
+                    logger.info("Batch contained no entities. Skipping...")
+                    continue
+                    
+                # Fetch context from graph
                 with neo4j_driver.session() as session:
-                    session.execute_write(add_refined_to_graph, refined_data)
-                logger.info(f"Added {len(refined_data.get('new_entities', []))} new entities and "
-                            f"{len(refined_data.get('new_relationships', []))} new relationships to the graph.")
-            else:
-                logger.info("Refinement complete. No new entities or relationships to add.")
+                    existing_graph_data = session.execute_read(get_existing_entities, list(all_entity_names))
+                
+                # Call ollama to refine entire batch
+                logger.info("Calling LLM to refine raw extractions...")
+                refined_data = refinement_chain.invoke({
+                    "graph_context": json.dumps(existing_graph_data, indent=2),
+                    "new_extraction": json.dumps(raw_extractions, indent=2)
+                })
+
+                 # Write validated knowledge to Graph
+                if refined_data and (refined_data.get("new_entities") or refined_data.get("new_relationships")):
+                    with neo4j_driver.session() as session:
+                        session.execute_write(add_refined_to_graph, refined_data)
+                    logger.info(f"Added {len(refined_data.get('new_entities', []))} new entities and "
+                                f"{len(refined_data.get('new_relationships', []))} new relationships to the graph.")
+                else:
+                    logger.info("Refinement complete. No new entities or relationships to add.")
+                
+                # Remove items from the queue
+                redis_client.ltrim(REDIS_QUEUE_KEY, len(raw_extractions_json), -1) 
+
+                # Brief pause between batches
+                time.sleep(1)
+
+            logger.info("Finished processing all batches in the queue.")
         
         except Exception as e:
             logger.error(f"Error during curation cycle: {e}")
@@ -152,6 +171,8 @@ def main():
     
 if __name__ == "__main__":
     try:
+        # Allow other services to spin up. 
+        time.sleep(10)
         main()
     except KeyboardInterrupt:
         logger.info("Curation service stopped by user.")
