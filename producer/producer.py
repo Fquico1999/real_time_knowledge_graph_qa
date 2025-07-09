@@ -15,6 +15,7 @@ KAFKA_BROKER_URL = os.environ.get("KAFKA_BROKER_URL", "localhost:29092")
 MAX_CONNECTION_ATTEMPTS = int(os.environ.get("MAX_CONNECTION_ATTEMPTS"))
 FEEDS_CONFIG_PATH = 'feeds.json'
 PROCESSED_ARTICLES_LOG = 'processed_articles.log'
+RAW_ARTICLE_DIR = os.environ.get("RAW_ARTICLE_DIR")
 
 # Better log formatting for module clarity
 log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
@@ -84,15 +85,29 @@ async def poll_feed(feed_config, producer):
                     
                     new_articles_found += 1
 
+                    storage_path = os.path.join(RAW_ARTICLE_DIR, f"{article_id}.json")
+                    
+                    # Create article json
                     article = {
                         "id": article_id,
                         "title": entry.title,
-                        "content": entry.summary,
+                        "storage_path": storage_path,
                         "source_url": entry.link,
+                        "content_summary": entry.summary
                     }
 
-                    producer.send(KAFKA_TOPIC, article)
-                    logger.info(f"[{feed_name}] Sent new article {article_id} ('{entry.title[:50]}...') to topic {KAFKA_TOPIC}")
+                    os.makedirs(os.path.dirname(storage_path), exist_ok=True)
+                    with open(storage_path, "w", encoding="utf-8") as f:
+                        json.dump(article, f, ensure_ascii=False, indent=4)
+
+                    # Create lightweight Kafka notification
+                    kafka_message = {
+                        "article_id": article_id,
+                        "storage_path": storage_path
+                    }
+
+                    producer.send(KAFKA_TOPIC, kafka_message)
+                    logger.info(f"[{feed_name}] Saved article {article_id} ('{entry.title[:50]}...') and notified Kafka on topic {KAFKA_TOPIC}")
 
                     save_processed_article(article_id)
                 if new_articles_found > 0:
